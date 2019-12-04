@@ -18,7 +18,7 @@ threadsafequeue: setup
 	$(CC) -o $(ODIR)/thread-safe-queue $(shell find $(ODIR)/ -type f -name \*.o) $(CLIBS)
 
 setup:
-	$(CC) -c main.c $(CFLAGS) -o $(ODIR)/main.o
+	$(CC) -c main.c $(CFLAGS) -o $(ODIR)/main.o $(CLIBS)
 
 clean:
 	rm -f $(ODIR)/*.o $(ODIR)/thread-safe-queue core
