@@ -1,4 +1,4 @@
-# This makefile is intended build the ThreadSafe-Queue solution
+# This makefile is intended to build the ThreadSafe-Queue solution
 # Written by Valentyn Faychuk at SoftServe on 05.12.2019
 # email:
 # 		faitchouk.valentyn@gmail.com
@@ -10,7 +10,7 @@ ODIR = build
 # Add here all the include directories
 IDIR = .
 # Add here all the sources in the project
-SOURCES = main
+SOURCES = main threadsafe-queue
 #A Add here all the libs, needed by the project
 CLIBS = -lpthread
 
