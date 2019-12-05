@@ -18,12 +18,12 @@
 #endif
 
 typedef struct thread_safe_queue_t {
+    size_t size;
     sem_t write_mutex;
     QUEUE_TYPE * begin_ptr;
     QUEUE_TYPE * write_ptr;
     QUEUE_TYPE * read_ptr;
     bool is_full;
-    size_t size;
 } thread_safe_queue_t;
 
 /* Initialize queue */
