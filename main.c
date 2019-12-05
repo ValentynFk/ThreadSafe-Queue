@@ -19,22 +19,22 @@ bool is_program_finished = false;
 pthread_mutex_t g_count_mutex;
 int g_counter = 0;
 
-void * thread_draining_routine(void * args) {
+void * thread_draining_routine(void * queue) {
     int tid = pthread_self();
     QUEUE_TYPE val;
     /* Routine, that pops values from the queue */
     while (!is_program_finished) {
-        if (pop_thread_safe_queue((thread_safe_queue_t*)args, &val) == 0) {
+        if (pop_thread_safe_queue((thread_safe_queue_t*)queue, &val) == 0) {
             printf("thread %u: %d\n", tid, val);
         }
     }
     pthread_exit(NULL);
 }
 
-void * thread_stuffing_routine(void * args) {
+void * thread_stuffing_routine(void * queue) {
     /* Routine, that pushes values to the queue */
     while (!is_program_finished) {
-        if (push_thread_safe_queue((thread_safe_queue_t*)args, g_counter) == 0) {
+        if (push_thread_safe_queue((thread_safe_queue_t*)queue, g_counter) == 0) {
             pthread_mutex_lock(&g_count_mutex);
             ++g_counter;
             pthread_mutex_unlock(&g_count_mutex);
