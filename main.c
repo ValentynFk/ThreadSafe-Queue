@@ -17,24 +17,34 @@
 
 bool is_program_finished = false;
 pthread_mutex_t g_count_mutex;
-int g_counter = 0;
+int g_counter;
 
 void * thread_draining_routine(void * args) {
     int tid = pthread_self();
+    QUEUE_TYPE val;
     /* Routine, that pops values from the queue */
     while (!is_program_finished) {
-        printf("thread %d: %d\n", tid, pop_thread_safe_queue(( thread_safe_queue_t*)args));
+        if (pop_thread_safe_queue((thread_safe_queue_t*)args, &val) == 0) {
+            printf("thread %u: %d\n", tid, val);
+        } else {
+            //printf("thread %d: null\n", tid);
+        }
     }
     pthread_exit(NULL);
 }
 
 void * thread_stuffing_routine(void * args) {
     /* Routine, that pushes values to the queue */
+    int i = 0;
     while (!is_program_finished) {
-        push_thread_safe_queue((thread_safe_queue_t*)args, g_counter);
-        pthread_mutex_lock(&g_count_mutex);
-        ++g_counter;
-        pthread_mutex_unlock(&g_count_mutex);
+        if (push_thread_safe_queue((thread_safe_queue_t*)args, i) == 0) {
+            ++i;
+            //pthread_mutex_lock(&g_count_mutex);
+            //++g_counter;
+            //pthread_mutex_unlock(&g_count_mutex);
+        } else {
+            //printf("thread %d: push failure\n", tid);
+        }
     }
     pthread_exit(NULL);
 }
@@ -43,6 +53,7 @@ int main (int argc, char ** argv)
 {
     thread_safe_queue_t * my_queue = NULL;
     init_thread_safe_queue(&my_queue, 500);
+    g_counter = 0;
     printf("Queue initialized\n");
     
     pthread_attr_t attr;
@@ -57,7 +68,8 @@ int main (int argc, char ** argv)
         pthread_create(&(tid[i+10]), &attr, &thread_draining_routine, (void *)my_queue);
     }
    
-    sleep(5);
+    for (long i = 0; i < 10000000; ++i) ;
+    //sleep(1);
 
     is_program_finished = true;
     for (int i = 0; i < 20; ++i) {

@@ -12,7 +12,7 @@ IDIR = .
 # Add here all the sources in the project
 SOURCES = main threadsafe-queue
 #A Add here all the libs, needed by the project
-CLIBS = -lpthread
+CLIBS = -lpthread -lrt
 
 CC = gcc
 CFLAGS = -g -I$(IDIR)

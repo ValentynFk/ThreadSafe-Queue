@@ -2,62 +2,42 @@
  * email:
  * 		faitchouk.valentyn@gmail.com
  */
-#include <pthread.h>
-#include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "threadsafe-queue.h"
 
-static void fetch_queue_allocation(thread_safe_queue_t * queue) {
-    if (queue -> alloc_size == 0) {
-        queue -> collection = malloc(sizeof(QUEUE_TYPE));
-        ++(queue -> alloc_size);
-        return;
+int init_thread_safe_queue(thread_safe_queue_t ** queue, size_t size) {
+    if (queue == NULL) {
+        LOGERROR("init failed, queue is NULL");
+        return -1;
     }
-    if (queue -> alloc_size <= queue -> real_size) {
-        QUEUE_TYPE * saved_collection = queue -> collection;
-        queue -> alloc_size *= 2;
-        queue -> collection = malloc(sizeof(QUEUE_TYPE) * queue -> alloc_size);
-        memcpy(queue -> collection, saved_collection, sizeof(QUEUE_TYPE) * queue -> real_size);
-        free(saved_collection);
-        return;
+    if (*queue != NULL) {
+        LOGERROR("init failed, queue was already initialized");
+        return -1;
     }
-    if (queue -> real_size != 0 && queue -> alloc_size > queue -> real_size * 2) {
-        QUEUE_TYPE * saved_collection = queue -> collection;
-        queue -> alloc_size /= 2;
-        queue -> collection = malloc(sizeof(QUEUE_TYPE) * queue -> alloc_size);
-        memcpy(queue -> collection, saved_collection, sizeof(QUEUE_TYPE) * queue -> real_size);
-        free(saved_collection);
-        return;
-    }
-}
-
-void init_thread_safe_queue(thread_safe_queue_t ** queue, size_t max_size) {
-    if (queue == NULL || *queue != NULL) {
-        LOGERROR("queue initialization failed");
-        return;
+    if (size == 0) {
+        LOGERROR("init failed, size can\'t be 0");
+        return -1;
     }
     *queue = malloc(sizeof(thread_safe_queue_t));
-    if (pthread_mutex_init(&((*queue) -> rw_lock), NULL) != 0) {
-        LOGERROR("mutex initialization failed");
-        return;
-    }
-    (*queue) -> max_size = max_size;
-    (*queue) -> alloc_size = 0;
-    (*queue) -> real_size = 0;
-    fetch_queue_allocation(*queue);
+    sem_init(&((*queue) -> write_mutex), 0, 1);
+    (*queue) -> size = size;
+    (*queue) -> is_full = false;
+    (*queue) -> begin_ptr = malloc(sizeof(QUEUE_TYPE) * size);
+    (*queue) -> write_ptr = (*queue) -> read_ptr = (*queue) -> begin_ptr;
+    return 0;
 }
 
-void destroy_thread_safe_queue(thread_safe_queue_t ** queue) {
+int destroy_thread_safe_queue(thread_safe_queue_t ** queue) {
     if (queue == NULL || *queue == NULL) {
         LOGERROR("failed, queue is NULL");
-        return;
+        return -1;
     }
-    pthread_mutex_destroy(&((*queue) -> rw_lock));
-    free((*queue) -> collection);
+    sem_destroy(&((*queue) -> write_mutex));
+    free((*queue) -> begin_ptr);
     free(*queue);
     *queue = NULL;
+    return 0;
 }
 
 int push_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE val) {
@@ -65,32 +45,45 @@ int push_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE val) {
         LOGERROR("push failed, queue is NULL");
         return -1;
     }
-    pthread_mutex_lock(&(queue -> rw_lock));
-    if (queue -> real_size >= queue -> max_size) {
+    sem_wait(&(queue -> write_mutex));
+    if (queue -> is_full) {
+        sem_post(&(queue -> write_mutex));
+        //LOGERROR("push failed, queue is full");
         return -1;
     }
-    fetch_queue_allocation(queue);
-    (queue -> collection)[queue -> real_size] = val;
-    ++(queue -> real_size);
-    pthread_mutex_unlock(&(queue -> rw_lock));
+    *(queue -> write_ptr) = val;
+    if (queue -> write_ptr == queue -> begin_ptr + (queue -> size - 1)) {
+        queue -> write_ptr = queue -> begin_ptr;
+    } else {
+        ++(queue -> write_ptr);
+    }
+    if (queue -> write_ptr == queue -> read_ptr) {
+        queue -> is_full = true;
+    }
+    sem_post(&(queue -> write_mutex));
     return 0;
 }
 
-int pop_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE * p_val) {
+int pop_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE * ret_val) {
     if (queue == NULL) {
         LOGERROR("pop failed, queue is NULL");
         return -1;
     }
-    pthread_mutex_lock(&(queue -> rw_lock));
-    if (queue -> real_size <= 0) {
+    sem_wait(&(queue -> write_mutex));
+    if (!queue -> is_full && queue -> write_ptr == queue -> read_ptr) {
+        sem_post(&(queue -> write_mutex));
+        //LOGERROR("pop failed, queue is empty");
         return -1;
     }
-    fetch_queue_allocation(queue);
-    *p_val = (queue -> collection)[0];
-    for (size_t i = 1; i < (queue -> real_size); ++i) {
-        (queue -> collection)[i-1] = (queue->collection)[i];
+    
+    *ret_val = *(queue -> read_ptr);
+    if (queue -> read_ptr == queue -> begin_ptr + (queue -> size - 1)) {
+        queue -> read_ptr = queue -> begin_ptr;
+    } else {
+        ++(queue -> read_ptr);
     }
-    --(queue -> real_size);
-    pthread_mutex_unlock(&(queue -> rw_lock));
+    queue -> is_full = false;
+    
+    sem_post(&(queue -> write_mutex));
     return 0;
 }

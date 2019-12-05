@@ -5,8 +5,10 @@
 #ifndef THREADSAFE_QUEUE
 #define THREADSAFE_QUEUE
 
+#include <sys/types.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -17,10 +19,11 @@
 
 typedef struct thread_safe_queue_t {
     sem_t write_mutex;
-    QUEUE_TYPE * collection;
-    size_t alloc_size;
-    size_t real_size;
-    size_t max_size;
+    QUEUE_TYPE * begin_ptr;
+    QUEUE_TYPE * write_ptr;
+    QUEUE_TYPE * read_ptr;
+    bool is_full;
+    size_t size;
 } thread_safe_queue_t;
 
 /* Initialize queue */
