@@ -9,11 +9,11 @@
 #define LOGERROR(err) printf("error: \"%s\"\n", (err))
 #define QUEUE_TYPE int
 
-struct thread_safe_queue_t {
+typedef struct thread_safe_queue_t {
     QUEUE_TYPE * collection;
     int alloc_size;
     int real_size;
-};
+} thread_safe_queue_t;
 
 pthread_mutex_t g_queue_rw_lock;
 
@@ -24,15 +24,44 @@ void push_thread_safe_queue(struct thread_safe_queue_t * queue, int val);
 // Pop from the front of queue
 int pop_thread_safe_queue(struct thread_safe_queue_t * queue);
 
+void * thread_draining_routine(void * args) {
+    // Routine, that stuff queue
+    while (1) {
+        printf("%d\n", pop_thread_safe_queue(( thread_safe_queue_t*)args));
+    }
+    return NULL;
+}
+
+void * thread_stuffing_routine(void * args) {
+    // Routine, that drain queue
+    int i = 0;
+    while (1) {
+        push_thread_safe_queue((struct thread_safe_queue_t*)args, i++);
+    }
+    return NULL;
+}
+
 int main (int argc, char ** argv)
 {
     struct thread_safe_queue_t * my_queue = NULL;
+    
+    pthread_t tid[20];
     init_thread_safe_queue(&my_queue);
-    push_thread_safe_queue(my_queue, 10);
-    push_thread_safe_queue(my_queue, 20);
-    printf("first value is: %d\n", pop_thread_safe_queue(my_queue));
-    printf("second value is: %d\n", pop_thread_safe_queue(my_queue));
-    destroy_thread_safe_queue(&my_queue);
+    
+    for (int i = 0; i < 10; ++i) {
+        pthread_create(&(tid[i]), NULL, &thread_stuffing_routine, (void *)my_queue);
+    }
+    for (int i = 0; i < 10; ++i) {
+        pthread_create(&(tid[i+10]), NULL, &thread_draining_routine, (void *)my_queue);
+    }
+
+    //push_thread_safe_queue(my_queue, 10);
+    //push_thread_safe_queue(my_queue, 20);
+    //printf("first value is: %d\n", pop_thread_safe_queue(my_queue));
+    //printf("second value is: %d\n", pop_thread_safe_queue(my_queue));
+    
+    for (long i = 0; i < 1000000000; ++i);
+    //destroy_thread_safe_queue(&my_queue);
     return 0;
 }
 
@@ -101,6 +130,10 @@ void push_thread_safe_queue(struct thread_safe_queue_t * queue, int val) {
 int pop_thread_safe_queue(struct thread_safe_queue_t * queue) {
     if (queue == NULL) {
         LOGERROR("pop failure");
+        return 0;
+    }
+    if (queue -> real_size == 0) {
+        LOGERROR("pop failed, queue is empty");
         return 0;
     }
     pthread_mutex_lock(&g_queue_rw_lock);
