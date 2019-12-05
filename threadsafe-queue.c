@@ -35,7 +35,7 @@ static void fetch_queue_allocation(thread_safe_queue_t * queue) {
 
 void init_thread_safe_queue(thread_safe_queue_t ** queue, size_t max_size) {
     if (queue == NULL || *queue != NULL) {
-        LOGERROR("initialization failed, queue is NULL");
+        LOGERROR("queue initialization failed");
         return;
     }
     *queue = malloc(sizeof(thread_safe_queue_t));
@@ -60,35 +60,37 @@ void destroy_thread_safe_queue(thread_safe_queue_t ** queue) {
     *queue = NULL;
 }
 
-void push_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE val) {
+int push_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE val) {
     if (queue == NULL) {
         LOGERROR("push failed, queue is NULL");
-        return;
+        return -1;
     }
     pthread_mutex_lock(&(queue -> rw_lock));
+    if (queue -> real_size >= queue -> max_size) {
+        return -1;
+    }
     fetch_queue_allocation(queue);
     (queue -> collection)[queue -> real_size] = val;
     ++(queue -> real_size);
     pthread_mutex_unlock(&(queue -> rw_lock));
+    return 0;
 }
 
-QUEUE_TYPE pop_thread_safe_queue(thread_safe_queue_t * queue) {
+int pop_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE * p_val) {
     if (queue == NULL) {
         LOGERROR("pop failed, queue is NULL");
-        return 0;
-    }
-    if (queue -> real_size == 0) {
-        LOGERROR("pop failed, queue is empty");
-        return 0;
+        return -1;
     }
     pthread_mutex_lock(&(queue -> rw_lock));
+    if (queue -> real_size <= 0) {
+        return -1;
+    }
     fetch_queue_allocation(queue);
-    QUEUE_TYPE val;
-    val = (queue -> collection)[0];
+    *p_val = (queue -> collection)[0];
     for (size_t i = 1; i < (queue -> real_size); ++i) {
         (queue -> collection)[i-1] = (queue->collection)[i];
     }
     --(queue -> real_size);
     pthread_mutex_unlock(&(queue -> rw_lock));
-    return val;
+    return 0;
 }

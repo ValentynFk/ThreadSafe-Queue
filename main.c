@@ -3,26 +3,40 @@
  * 		faitchouk.valentyn@gmail.com
  */
 #include <pthread.h>
+#include <stdbool.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+/* You can redefine type of the queue.
+ * Just type before including queue:
+ * #define QUEUE_TYPE char
+ */
+
 #include "threadsafe-queue.h"
 
+bool is_program_finished = false;
+pthread_mutex_t g_count_mutex;
+int g_counter = 0;
+
 void * thread_draining_routine(void * args) {
+    int tid = pthread_self();
     /* Routine, that pops values from the queue */
-    while (1) {
-        printf("%d\n", pop_thread_safe_queue(( thread_safe_queue_t*)args));
+    while (!is_program_finished) {
+        printf("thread %d: %d\n", tid, pop_thread_safe_queue(( thread_safe_queue_t*)args));
     }
-    return NULL;
+    pthread_exit(NULL);
 }
 
 void * thread_stuffing_routine(void * args) {
-    /* Routine, that push values to the queue */
-    int i = 0;
-    while (1) {
-        push_thread_safe_queue((thread_safe_queue_t*)args, i++);
+    /* Routine, that pushes values to the queue */
+    while (!is_program_finished) {
+        push_thread_safe_queue((thread_safe_queue_t*)args, g_counter);
+        pthread_mutex_lock(&g_count_mutex);
+        ++g_counter;
+        pthread_mutex_unlock(&g_count_mutex);
     }
-    return NULL;
+    pthread_exit(NULL);
 }
 
 int main (int argc, char ** argv)
@@ -31,15 +45,26 @@ int main (int argc, char ** argv)
     init_thread_safe_queue(&my_queue, 500);
     printf("Queue initialized\n");
     
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_mutex_init(&g_count_mutex, NULL);
     pthread_t tid[20];
     for (int i = 0; i < 10; ++i) {
-        pthread_create(&(tid[i]), NULL, &thread_stuffing_routine, (void *)my_queue);
+        pthread_create(&(tid[i]), &attr, &thread_stuffing_routine, (void *)my_queue);
     }
     for (int i = 0; i < 10; ++i) {
-        pthread_create(&(tid[i+10]), NULL, &thread_draining_routine, (void *)my_queue);
+        pthread_create(&(tid[i+10]), &attr, &thread_draining_routine, (void *)my_queue);
     }
    
-    for (long i = 0; i < 1000000000; ++i);
-    //destroy_thread_safe_queue(&my_queue);
+    sleep(5);
+
+    is_program_finished = true;
+    for (int i = 0; i < 20; ++i) {
+        pthread_join(tid[i], NULL);
+    }
+    destroy_thread_safe_queue(&my_queue);
+    pthread_mutex_destroy(&g_count_mutex);
+    pthread_attr_destroy(&attr);
     return 0;
 }

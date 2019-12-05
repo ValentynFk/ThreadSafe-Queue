@@ -5,15 +5,18 @@
 #ifndef THREADSAFE_QUEUE
 #define THREADSAFE_QUEUE
 
-#include <pthread.h> /* pthread_mutex_t */
-#include <stdlib.h>  /* size_t */
-#include <stdio.h>   /* printf() */
+#include <semaphore.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #define LOGERROR(err) printf("error: \"%s\"\n", (err))
+#ifndef QUEUE_TYPE
 #define QUEUE_TYPE int
+#endif
 
 typedef struct thread_safe_queue_t {
-    pthread_mutex_t rw_lock;
+    sem_t write_mutex;
     QUEUE_TYPE * collection;
     size_t alloc_size;
     size_t real_size;
@@ -21,11 +24,12 @@ typedef struct thread_safe_queue_t {
 } thread_safe_queue_t;
 
 /* Initialize queue */
-void init_thread_safe_queue(thread_safe_queue_t ** queue, size_t max_size);
+int init_thread_safe_queue(thread_safe_queue_t ** queue, size_t max_size);
 /* Destroy queue (queue must be first initialized */
-void destroy_thread_safe_queue(thread_safe_queue_t ** queue);
+int destroy_thread_safe_queue(thread_safe_queue_t ** queue);
 /* Push to the back of queue */
-void push_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE val);
-QUEUE_TYPE pop_thread_safe_queue(thread_safe_queue_t * queue);
+int push_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE val);
+/* Pop value from the fornt of queue */
+int pop_thread_safe_queue(thread_safe_queue_t * queue, QUEUE_TYPE *val);
 
 #endif
